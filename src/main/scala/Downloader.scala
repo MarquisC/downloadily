@@ -3,6 +3,7 @@ package io.enigma.downloadily
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.io.{BufferedInputStream, File, FileOutputStream}
+import java.nio.file.FileAlreadyExistsException
 
 case class Downloadable(source : String, destination : String) {}
 
@@ -44,6 +45,10 @@ case class LocalDiskDownloader(obj : Downloadable) extends Downloader(obj) {
     if(this.fileOutputStream.isEmpty) {
       logger.debug("Creating new File Output Stream.")
       this.outputFile = Option(new File(generateOutputFileName(this.obj)))
+      if(this.outputFile.get.isFile && !this.overwriteFile) {
+        logger.debug("File exists, but file overwrite is not enabled")
+        throw new FileAlreadyExistsException(s"${this.outputFile.get}")
+      }
       this.fileOutputStream = Option(new FileOutputStream(this.outputFile.get, this.overwriteFile))
     }
 
@@ -100,9 +105,7 @@ object Downloader {
         }
       downloader.download()
     } catch {
-      case e => {
-        logger.error(s"Failure in downloading fail [${obj.source}]")
-      }
+      case e => logger.error(s"Failure in downloading file [${obj.source}], for error [${e}]")
     }
 
   }

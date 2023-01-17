@@ -1,19 +1,23 @@
 package io.enigma.downloadily.controllers
 
 import com.google.gson.{GsonBuilder, JsonSyntaxException}
+import io.enigma.downloadily.Config.ThreadPoolIsFullException
+import io.enigma.downloadily.models.{DownloadRouteModels, ResponseModels}
+import io.enigma.downloadily.{Config, Downloader, HttpUtils}
 import io.javalin.http.{Context, HandlerType}
 import io.javalin.util.function.ThrowingRunnable
-import io.enigma.downloadily.models.ResponseModels
-import io.enigma.downloadily.{Main, Downloader, Downloadable}
+import org.slf4j.{Logger, LoggerFactory}
 
-import java.util
-
-sealed class ThreadPoolIsFullException extends Exception {}
+import java.net.http.HttpResponse
+import java.util.concurrent.ThreadPoolExecutor
 
 case class DownloadController(override val handlerPath : String, override val handlerType: HandlerType) extends Controller(handlerPath, handlerType) {
+
+  val logger: Logger = LoggerFactory.getLogger(classOf[DownloadController])
+
   override def handle(ctx: Context): Unit = {
     ctx.async(
-      Main.JAVALIN_THREAD_POOL, 120, new Runnable {
+      Config.JAVALIN_THREAD_POOL, 120, new Runnable {
 
         val gson = new GsonBuilder()
           .excludeFieldsWithoutExposeAnnotation()
@@ -30,29 +34,25 @@ case class DownloadController(override val handlerPath : String, override val ha
 
         override def run(): Unit = {
           try {
-            if(Main.JAVALIN_DOWNLOADER_THREAD_POOL.asInstanceOf[java.util.concurrent.ThreadPoolExecutor].getActiveCount >=
-              Main.JAVALIN_DOWNLOADER_THREAD_POOL.asInstanceOf[java.util.concurrent.ThreadPoolExecutor].getMaximumPoolSize
-            ) {
-              // Don't schedule new work and return error response
-              throw new ThreadPoolIsFullException
+            val downloadPostModel = gson.fromJson(ctx.body(), new DownloadRouteModels.DownloadPostModel().getClass)
+
+            if(Config.isThreadPoolFull(Config.JAVALIN_DOWNLOADER_THREAD_POOL.asInstanceOf[ThreadPoolExecutor])) {
+              throw new ThreadPoolIsFullException()
             }
 
-            // ToDo, easy automagic gson -> Scala class/case class deser
-            val jsonMap = gson.fromJson(ctx.body(), new util.HashMap().getClass)
-            if(!jsonMap.containsKey("url")) {
-              // Invalid JSON, must contain url
-            }
-            val source : String = jsonMap.get("url")
-
-            Main.JAVALIN_DOWNLOADER_THREAD_POOL.submit(new Runnable {
+            Config.JAVALIN_DOWNLOADER_THREAD_POOL.submit(new Runnable {
               override def run(): Unit = {
-                val target : Option[String] = Option(jsonMap.get("destination"))
-                Downloader.download(Downloadable(source, target.getOrElse("./")))
+                val http = new HttpUtils()
+                val response = http.httpGetRequest(downloadPostModel.url, 10).asInstanceOf[HttpResponse[_]]
+                if(http.getContentLength(response) != "-1") {
+                  logger.debug(s"The download's content length is [${http.getContentLength(response)}]")
+                  Downloader.download(downloadPostModel.createDownloadable)
+                }
               }
             })
 
             ctx.status(201)
-            ctx.result(gson.toJson(s"Download for URL [${source}] initiated"))
+            ctx.result(gson.toJson(s"Download for URL [${downloadPostModel.url}] initiated"))
 
           } catch {
             case _: ThreadPoolIsFullException => {

@@ -1,17 +1,12 @@
 package io.enigma.downloadily
 
-import io.javalin.http.HandlerType
 import io.javalin.Javalin
-
+import io.javalin.http.HandlerType
 import org.slf4j.{Logger, LoggerFactory}
 
-import java.util.concurrent.{ExecutorService, Executors}
-
 object Main {
-  val logger: Logger = LoggerFactory.getLogger(classOf[Main.type])
 
-  val JAVALIN_THREAD_POOL: ExecutorService = Executors.newFixedThreadPool(10)
-  val JAVALIN_DOWNLOADER_THREAD_POOL: ExecutorService = Executors.newFixedThreadPool(3)
+  val logger: Logger = LoggerFactory.getLogger(classOf[Main.type])
 
   def main(args: Array[String]): Unit = {
     val app = Javalin.create()
