@@ -43,6 +43,7 @@ case class DownloadController(override val handlerPath : String, override val ha
             Config.JAVALIN_DOWNLOADER_THREAD_POOL.submit(new Runnable {
               override def run(): Unit = {
                 val http = new HttpUtils()
+                // Check if there's data to process
                 val response = http.httpGetRequest(downloadPostModel.url, 10).asInstanceOf[HttpResponse[_]]
                 if(http.getContentLength(response) != "-1") {
                   logger.debug(s"The download's content length is [${http.getContentLength(response)}]")

@@ -14,4 +14,8 @@ post:
 
 install_localstack_mac:
 	# Reference: https://docs.localstack.cloud/getting-started/installation/#installation
-	brew install localstack
+	pip install localstack
+	pip install awscli-local
+
+start_localstack:
+	localstack start -d

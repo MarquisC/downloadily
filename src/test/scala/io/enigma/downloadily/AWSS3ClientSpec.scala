@@ -2,21 +2,16 @@ package io.enigma.downloadily
 package io.enigma.downloadily
 
 import org.scalatest.flatspec.AnyFlatSpec
+import software.amazon.awssdk.auth.credentials.{AwsCredentials, StaticCredentialsProvider}
 
-import java.net.http.HttpResponse
-
-class HttpUtilsSpec extends AnyFlatSpec {
-  "HTTP Head" should "perform a head request successfully" in {
-    val source = "https://ichef.bbci.co.uk/news/912/cpsprodpb/17D2D/production/_111718579_press_release_3.png"
-    val http = new HttpUtils()
-    val response = http.httpHeadRequest(source, 10)
-    assert(response.asInstanceOf[HttpResponse[_]].statusCode() == 200)
-  }
-  "HTTP Get" should "perform a get request successfully and grab the content-length" in {
-    val source = "https://ichef.bbci.co.uk/news/912/cpsprodpb/17D2D/production/_111718579_press_release_3.png"
-    val http = new HttpUtils()
-    val response = http.httpGetRequest(source, 10).asInstanceOf[HttpResponse[_]]
-    println(s"HTTP Get Content Length [${http.getContentLength(response)}]")
-    assert(!http.getContentLength(response).equals("-1"))
+class AWSS3ClientSpec extends AnyFlatSpec {
+  "AWSS3Client" should "generate successfully and connect to localstack" in {
+    val s3 = AWSS3Client("us-east-1", "http://localhost:4566", StaticCredentialsProvider.create(new AwsCredentials {
+      override def accessKeyId(): String = "test"
+      override def secretAccessKey(): String = "test"
+    }))
+    val listBucketsResponse = s3.client.listBuckets()
+    println(listBucketsResponse)
+    assert(listBucketsResponse.hasBuckets)
   }
 }
