@@ -1,8 +1,9 @@
 package io.enigma.downloadily
 
 import org.slf4j.{Logger, LoggerFactory}
+import software.amazon.awssdk.auth.credentials.{AwsCredentials, StaticCredentialsProvider}
 import software.amazon.awssdk.core.async.AsyncRequestBody
-import software.amazon.awssdk.services.s3.model.{CompleteMultipartUploadRequest, CompletedMultipartUpload, CompletedPart, CreateMultipartUploadRequest, CreateMultipartUploadResponse, UploadPartRequest}
+import software.amazon.awssdk.services.s3.model.{CompleteMultipartUploadRequest, CompletedMultipartUpload, CompletedPart, CreateMultipartUploadRequest, CreateMultipartUploadResponse, HeadBucketRequest, UploadPartRequest}
 
 import java.io.{BufferedInputStream, File, FileOutputStream}
 import java.nio.file.FileAlreadyExistsException
@@ -84,22 +85,38 @@ case class LocalDiskDownloader(obj : Downloadable) extends Downloader(obj) {
 }
 
 case class S3Downloader(obj : Downloadable,
-                        s3Client : AWSS3Client,
-                        s3BucketName : String,
+                        var s3Client : Option[AWSS3Client],
+                        var s3BucketName : String,
                         s3KeyName : String) extends Downloader(obj) {
 
   val logger: Logger = LoggerFactory.getLogger(classOf[S3Downloader])
 
 
+  //ToDo, verified multi-part works, pull down content-length and judge if we can just do S3 put normally
+  // For multi-part uploads each chunk, (except the last) must be >= 5 MB
+  this.BUFFER_SIZE = 1048576 * 5
+
   /*
     Reference:
     https://docs.aws.amazon.com/AmazonS3/latest/userguide/mpu-upload-object.html
-
    */
+
+ if(this.s3Client.isEmpty) {
+   this.s3Client = Some(AWSS3Client("us-east-1", "http://localhost:4566", StaticCredentialsProvider.create(new AwsCredentials {
+      override def accessKeyId(): String = "test"
+      override def secretAccessKey(): String = "test"
+    }
+   )))
+ }
+
+  this.s3BucketName = this.s3BucketName.split("s3://")(1)
+
+  // This will throw an exception if the bucket is not found
+  val headBucketResponse = this.s3Client.get.client.headBucket(HeadBucketRequest.builder().bucket(s3BucketName).build()).get()
 
   var initialMultipartUploadRequest : CreateMultipartUploadRequest = _
   var initialMultiPartResponse : CreateMultipartUploadResponse = _
-  var completedChunkResponses : util.ArrayList[CompletedPart]
+  var completedChunkResponses : util.ArrayList[CompletedPart] = new util.ArrayList[CompletedPart]()
   var filePartIncrementor = 0
 
   override def foreachByteChunkCallable(arr : Seq[Int]): Unit = {
@@ -113,7 +130,7 @@ case class S3Downloader(obj : Downloadable,
           .key(s3KeyName)
           .build()
 
-      this.initialMultiPartResponse = this.s3Client
+      this.initialMultiPartResponse = this.s3Client.get
         .client
         .createMultipartUpload(this.initialMultipartUploadRequest)
         .get()
@@ -125,7 +142,7 @@ case class S3Downloader(obj : Downloadable,
         .partNumber(filePartIncrementor).build()
 
       val requestBodyBytes = AsyncRequestBody.fromBytes(arr.map(_.toByte).toArray)
-      val uploadPartResponse = s3Client.client.uploadPart(uploadPartRequest, requestBodyBytes).get()
+      val uploadPartResponse = this.s3Client.get.client.uploadPart(uploadPartRequest, requestBodyBytes).get()
       val complChunk = CompletedPart.builder.partNumber(this.filePartIncrementor)
         .eTag(uploadPartResponse.eTag()).build()
       completedChunkResponses.add(complChunk)
@@ -139,7 +156,7 @@ case class S3Downloader(obj : Downloadable,
       .partNumber(filePartIncrementor).build()
 
     val requestBodyBytes = AsyncRequestBody.fromBytes(arr.map(_.toByte).toArray)
-    val uploadPartResponse = s3Client.client.uploadPart(uploadPartRequest, requestBodyBytes).get()
+    val uploadPartResponse = s3Client.get.client.uploadPart(uploadPartRequest, requestBodyBytes).get()
     val complChunk = CompletedPart.builder.partNumber(this.filePartIncrementor)
       .eTag(uploadPartResponse.eTag()).build()
     completedChunkResponses.add(complChunk)
@@ -158,11 +175,17 @@ case class S3Downloader(obj : Downloadable,
     bufferedInputStream.close()
 
     if(this.initialMultiPartResponse != null) {
+      //ToDo add to destination
+      logger.info(s"Completing multipart upload for file from source [${this.obj.source}]")
       val completedMultipartUpload = CompletedMultipartUpload.builder.parts(this.completedChunkResponses).build
+
       val completeMultipartUploadRequest = CompleteMultipartUploadRequest
         .builder.bucket(s3BucketName).key(s3KeyName).uploadId(this.initialMultiPartResponse.uploadId()
       ).multipartUpload(completedMultipartUpload).build
-      this.s3Client.client.completeMultipartUpload(completeMultipartUploadRequest)
+
+      val completedMultipartUploadResponse =
+        this.s3Client.get.client.completeMultipartUpload(completeMultipartUploadRequest).get()
+      logger.debug(s"${completedMultipartUploadResponse}")
     }
   }
 }
@@ -170,14 +193,20 @@ case class S3Downloader(obj : Downloadable,
 object Downloader {
 
   val logger: Logger = LoggerFactory.getLogger(classOf[Downloader])
+  var s3Client : Option[AWSS3Client] = None
+
+  def setS3Client(c : AWSS3Client): Unit = {
+    this.s3Client = Option(c).orElse(None)
+  }
 
   def download(obj : Downloadable): Unit = {
     logger.info(s"Attempting to download a file from [${obj.source}]")
     try {
       var downloader: Downloader = LocalDiskDownloader(obj)
        if(obj.destination.contains("s3")) {
-          logger.info(s"Attempting to download a file to S3 destination [${obj.destination}]")
-          downloader = S3Downloader(obj, null, "", "")
+          val destinationKey = downloader.generateOutputFileName(obj)
+         logger.info(s"Attempting to download a file to S3 destination [${obj.destination}/${destinationKey}]")
+         downloader = S3Downloader(obj, this.s3Client, obj.destination, destinationKey)
         }
       downloader.download()
     } catch {

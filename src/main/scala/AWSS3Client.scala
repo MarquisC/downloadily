@@ -18,7 +18,11 @@ case class AWSS3Client(var region : String = "us-east-1",
   var client : S3AsyncClient = {
     if (endpointURL.isEmpty)
       S3AsyncClient.builder.region(clientRegion).credentialsProvider(credentialsProvider).build
-    else S3AsyncClient.builder.endpointOverride(new URI(endpointURL)).region(clientRegion).credentialsProvider(credentialsProvider).build
+    else S3AsyncClient.builder.endpointOverride(new URI(endpointURL))
+      .region(clientRegion)
+      .credentialsProvider(credentialsProvider)
+      .forcePathStyle(true)
+      .build
   }
 }
 
