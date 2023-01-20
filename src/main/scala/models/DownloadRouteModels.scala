@@ -5,6 +5,7 @@ import io.enigma.downloadily.Downloadable
 import org.jetbrains.annotations.{NotNull, Nullable}
 
 object DownloadRouteModels {
+  // This model really needs more information...
   class DownloadPostModel {
     @Expose @NotNull
     var url : String = _

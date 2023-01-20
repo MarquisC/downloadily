@@ -16,9 +16,10 @@ case class AWSS3Client(var region : String = "us-east-1",
 
   var clientRegion : Region = Region.of(region)
   var client : S3AsyncClient = {
-    if (endpointURL.isEmpty)
+    if (endpointURL.isEmpty) {
       S3AsyncClient.builder.region(clientRegion).credentialsProvider(credentialsProvider).build
-    else S3AsyncClient.builder.endpointOverride(new URI(endpointURL))
+      // ToDo add something like "localstack" mode...
+    } else S3AsyncClient.builder.endpointOverride(new URI(endpointURL))
       .region(clientRegion)
       .credentialsProvider(credentialsProvider)
       .forcePathStyle(true)
@@ -27,6 +28,7 @@ case class AWSS3Client(var region : String = "us-east-1",
 }
 
 object AWSS3Client {
+  // is this thread safe
   def createClient(region: String, endpointURL : String, credentialsProvider : AwsCredentialsProvider) : AWSS3Client = {
     AWSS3Client(region, endpointURL, credentialsProvider)
   }

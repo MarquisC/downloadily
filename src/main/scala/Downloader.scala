@@ -109,16 +109,20 @@ case class S3Downloader(obj : Downloadable,
    )))
  }
 
+  // Do better here
   this.s3BucketName = this.s3BucketName.split("s3://")(1)
 
   // This will throw an exception if the bucket is not found
   val headBucketResponse = this.s3Client.get.client.headBucket(HeadBucketRequest.builder().bucket(s3BucketName).build()).get()
 
+
+  // Will they hate me for mutating variables?
   var initialMultipartUploadRequest : CreateMultipartUploadRequest = _
   var initialMultiPartResponse : CreateMultipartUploadResponse = _
   var completedChunkResponses : util.ArrayList[CompletedPart] = new util.ArrayList[CompletedPart]()
   var filePartIncrementor = 0
 
+  // I can make this tail recursive a little easier
   override def foreachByteChunkCallable(arr : Seq[Int]): Unit = {
     if(this.filePartIncrementor == 0) {
 
@@ -183,6 +187,7 @@ case class S3Downloader(obj : Downloadable,
         .builder.bucket(s3BucketName).key(s3KeyName).uploadId(this.initialMultiPartResponse.uploadId()
       ).multipartUpload(completedMultipartUpload).build
 
+     // Don't forget to add abort exception handling for mishandled multipart chunks that don't fail until the end
       val completedMultipartUploadResponse =
         this.s3Client.get.client.completeMultipartUpload(completeMultipartUploadRequest).get()
       logger.debug(s"${completedMultipartUploadResponse}")
@@ -199,11 +204,14 @@ object Downloader {
     this.s3Client = Option(c).orElse(None)
   }
 
+  // Is this function thread safe?
   def download(obj : Downloadable): Unit = {
     logger.info(s"Attempting to download a file from [${obj.source}]")
     try {
       var downloader: Downloader = LocalDiskDownloader(obj)
+      // do something better than this
        if(obj.destination.contains("s3")) {
+         // Do something better than this
           val destinationKey = downloader.generateOutputFileName(obj)
          logger.info(s"Attempting to download a file to S3 destination [${obj.destination}/${destinationKey}]")
          downloader = S3Downloader(obj, this.s3Client, obj.destination, destinationKey)
