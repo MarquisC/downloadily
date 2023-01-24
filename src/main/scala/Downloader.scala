@@ -3,15 +3,17 @@ package io.enigma.downloadily
 import org.slf4j.{Logger, LoggerFactory}
 import software.amazon.awssdk.auth.credentials.{AwsCredentials, StaticCredentialsProvider}
 import software.amazon.awssdk.core.async.AsyncRequestBody
-import software.amazon.awssdk.services.s3.model.{CompleteMultipartUploadRequest, CompletedMultipartUpload, CompletedPart, CreateMultipartUploadRequest, CreateMultipartUploadResponse, HeadBucketRequest, UploadPartRequest}
+import software.amazon.awssdk.services.s3.model.{CompleteMultipartUploadRequest, CompletedMultipartUpload, CompletedPart, CreateMultipartUploadRequest, CreateMultipartUploadResponse, HeadBucketRequest, PutObjectRequest, UploadPartRequest}
 
 import java.io.{BufferedInputStream, File, FileOutputStream}
+import java.net.http.HttpResponse
+import java.net.http.HttpResponse.BodyHandlers
 import java.nio.file.FileAlreadyExistsException
 import java.util
 
 case class Downloadable(source : String, destination : String) {}
 
-sealed abstract class Downloader(obj : Downloadable) {
+sealed abstract class ChunkyDownloader(obj : Downloadable) {
 
   var BUFFER_SIZE = 1024
 
@@ -37,7 +39,7 @@ sealed abstract class Downloader(obj : Downloadable) {
   }
 }
 
-case class LocalDiskDownloader(obj : Downloadable) extends Downloader(obj) {
+case class LocalDiskDownloader(obj : Downloadable) extends ChunkyDownloader(obj) {
 
   val logger: Logger = LoggerFactory.getLogger(classOf[LocalDiskDownloader])
 
@@ -87,12 +89,12 @@ case class LocalDiskDownloader(obj : Downloadable) extends Downloader(obj) {
 case class S3Downloader(obj : Downloadable,
                         var s3Client : Option[AWSS3Client],
                         var s3BucketName : String,
-                        s3KeyName : String) extends Downloader(obj) {
+                        s3KeyName : String) extends ChunkyDownloader(obj) {
 
   val logger: Logger = LoggerFactory.getLogger(classOf[S3Downloader])
 
 
-  //ToDo, verified multi-part works, pull down content-length and judge if we can just do S3 put normally
+  // ToDo, verified multi-part works, pull down content-length and judge if we can just do S3 put normally
   // For multi-part uploads each chunk, (except the last) must be >= 5 MB
   this.BUFFER_SIZE = 1048576 * 5
 
@@ -112,9 +114,12 @@ case class S3Downloader(obj : Downloadable,
   // Do better here
   this.s3BucketName = this.s3BucketName.split("s3://")(1)
 
-  // This will throw an exception if the bucket is not found
-  val headBucketResponse = this.s3Client.get.client.headBucket(HeadBucketRequest.builder().bucket(s3BucketName).build()).get()
-
+  try {
+    this.s3Client.get.client.headBucket(HeadBucketRequest.builder().bucket(s3BucketName).build()).get()
+  }
+  catch {
+    case e: Throwable => throw new Exception(s"S3 HeadBucketRequest has failed [${e.getMessage}]")
+  }
 
   // Will they hate me for mutating variables?
   var initialMultipartUploadRequest : CreateMultipartUploadRequest = _
@@ -171,6 +176,25 @@ case class S3Downloader(obj : Downloadable,
     ToDo, add exception handling for aborting upload
    */
   def download() : Unit = {
+
+    val http = new HttpUtils()
+    val response = http.httpGetRequest(this.obj.source, 30).asInstanceOf[HttpResponse[_]]
+    if(http.getContentLength(response) != "-1") {
+      logger.debug(s"The download's content length is [${http.getContentLength(response)}]")
+    }
+
+    if (http.getContentLength(response).toLong < this.BUFFER_SIZE) {
+      logger.debug(s"The download's content length is within the bounds for a PutObject request, initiating.")
+      val responseBody = http.httpGetRequest(this.obj.source, 30, BodyHandlers.ofByteArray()).asInstanceOf[HttpResponse[_]]
+      val s3PutObjectRequest = PutObjectRequest.builder()
+        .bucket(this.s3BucketName).key(this.s3KeyName)
+        .contentLength(http.getContentLength(response).toLong).build()
+      val s3PutObjectResponse = this.s3Client.get.client.putObject(s3PutObjectRequest,
+        AsyncRequestBody.fromBytes(responseBody.body().asInstanceOf[Array[Byte]])).get()
+      logger.debug(s"PutObjectRequest's response ${s3PutObjectResponse} ")
+      return
+    }
+
     val (iterator, bufferedInputStream) = createStream()
     iterator
       .grouped(BUFFER_SIZE)
@@ -195,8 +219,7 @@ case class S3Downloader(obj : Downloadable,
   }
 }
 
-object Downloader {
-
+case class Downloader() {
   val logger: Logger = LoggerFactory.getLogger(classOf[Downloader])
   var s3Client : Option[AWSS3Client] = None
 
@@ -208,19 +231,23 @@ object Downloader {
   def download(obj : Downloadable): Unit = {
     logger.info(s"Attempting to download a file from [${obj.source}]")
     try {
-      var downloader: Downloader = LocalDiskDownloader(obj)
+      var downloader: ChunkyDownloader = LocalDiskDownloader(obj)
       // do something better than this
-       if(obj.destination.contains("s3")) {
-         // Do something better than this
-          val destinationKey = downloader.generateOutputFileName(obj)
-         logger.info(s"Attempting to download a file to S3 destination [${obj.destination}/${destinationKey}]")
-         downloader = S3Downloader(obj, this.s3Client, obj.destination, destinationKey)
-        }
+      if(obj.destination.contains("s3")) {
+        // Do something better than this
+        val destinationKey = downloader.generateOutputFileName(obj)
+        logger.info(s"Attempting to download a file to S3 destination [${obj.destination}/${destinationKey}]")
+        downloader = S3Downloader(obj, this.s3Client, obj.destination, destinationKey)
+      }
       downloader.download()
     } catch {
-      case e => logger.error(s"Failure in downloading file [${obj.source}], for error [${e}]")
+      case e: Throwable => logger.error(s"Failure in downloading file [${obj.source}], for error [${e}]")
     }
 
   }
-
+}
+object Downloader {
+  def download(obj : Downloadable): Unit = {
+    new Downloader().download(obj)
+  }
 }

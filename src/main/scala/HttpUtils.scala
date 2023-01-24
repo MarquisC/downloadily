@@ -18,7 +18,9 @@ class HttpUtils {
     httpClient.send(requestHead, BodyHandlers.discarding())
   }
 
-  def httpGetRequest(url: String, connectionTimeout : Int): Any = {
+  def httpGetRequest(url: String, connectionTimeout : Int,
+  bodyHandler : HttpResponse.BodyHandler[_] = BodyHandlers.discarding()
+                    ): Any = {
 
     val httpClient: HttpClient = HttpClient.newBuilder()
       .connectTimeout(Duration.ofSeconds(connectionTimeout))
@@ -26,7 +28,7 @@ class HttpUtils {
 
     val requestHead = HttpRequest.newBuilder().GET().uri(URI.create(url)).build()
 
-    httpClient.send(requestHead, BodyHandlers.discarding())
+    httpClient.send(requestHead, bodyHandler)
   }
 
   def getContentLength(response: HttpResponse[_]) : String = {

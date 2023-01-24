@@ -5,10 +5,6 @@ import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.S3AsyncClient
 import java.net.URI
 
-/*
-    Example Credentials Provider
-    DefaultCredentialsProvider.builder().build()
- */
 case class AWSS3Client(var region : String = "us-east-1",
                        var endpointURL : String = "",
                        var credentialsProvider : AwsCredentialsProvider
@@ -28,8 +24,7 @@ case class AWSS3Client(var region : String = "us-east-1",
 }
 
 object AWSS3Client {
-  // is this thread safe
-  def createClient(region: String, endpointURL : String, credentialsProvider : AwsCredentialsProvider) : AWSS3Client = {
-    AWSS3Client(region, endpointURL, credentialsProvider)
+  def apply(region: String, endpointURL : String, credentialsProvider : AwsCredentialsProvider) : AWSS3Client = {
+    new AWSS3Client(region, endpointURL, credentialsProvider)
   }
 }

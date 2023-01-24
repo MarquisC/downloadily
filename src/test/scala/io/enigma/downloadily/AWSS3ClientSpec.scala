@@ -15,11 +15,15 @@ class AWSS3ClientSpec extends AnyFlatSpec {
     assert(listBucketsResponse.hasBuckets)
   }
 
-  "AWSS3Client" should "download a file to s3 successfully" in {
-    //val source = "https://raw.githubusercontent.com/zio/zio-http/main/zio-http-example/src/main/scala/example/FileStreaming.scala"
-    val source = "https://freetestdata.com/wp-content/uploads/2021/09/Free_Test_Data_1OMB_MP3.mp3"
-    var d = Downloadable(source, "s3://test-bucket1")
+  "AWSS3Client" should "non-multipart download a file to s3 successfully" in {
+    val source = "https://raw.githubusercontent.com/zio/zio-http/main/zio-http-example/src/main/scala/example/FileStreaming.scala"
+    val d = Downloadable(source, "s3://test-bucket1")
     Downloader.download(d)
-    //this.s3Client.get.client.headBucket(HeadBucketRequest.builder().bucket("test-bucket1").build()).get()
+  }
+
+  "AWSS3Client" should "multipart download a file to s3 successfully" in {
+    val source = "https://freetestdata.com/wp-content/uploads/2021/09/Free_Test_Data_1OMB_MP3.mp3"
+    val d = Downloadable(source, "s3://test-bucket1")
+    Downloader.download(d)
   }
 }
