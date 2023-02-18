@@ -3,7 +3,6 @@ package io.enigma.downloadily.models
 import com.google.gson.annotations.Expose
 
 object ResponseModels {
-
   class ResponseModel {
     @Expose
     var message : String = _
@@ -15,5 +14,4 @@ object ResponseModels {
       this.httpStatusCode = httpStatusCode
     }
   }
-
 }

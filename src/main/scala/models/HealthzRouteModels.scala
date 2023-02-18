@@ -6,6 +6,5 @@ object HealthzRouteModels {
       new ResponseModels.ResponseModel(message, httpStatusCode)
     }
   }
-
 }
 
