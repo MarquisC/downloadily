@@ -1,7 +1,16 @@
 # Root Makefile
 
-unit_tests:
+all_test:
 	sbt test
+
+standalone_tests:
+	sbt "test:testOnly *standalone*"
+
+integration_tests: start_localstack
+	(cd ./infra && ./create_s3.sh)
+	sbt "test:testOnly *integration*"
+	localstack stop
+
 compile:
 	sbt compile
 run:
@@ -19,3 +28,7 @@ install_localstack_mac:
 
 start_localstack:
 	localstack start -d
+	localstack wait
+
+stop_localstack:
+	localstack stop

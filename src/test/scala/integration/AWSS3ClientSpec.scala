@@ -1,5 +1,5 @@
 package io.enigma.downloadily
-package io.enigma.downloadily
+package integration
 
 import org.scalatest.flatspec.AnyFlatSpec
 import software.amazon.awssdk.auth.credentials.{AwsCredentials, StaticCredentialsProvider}

@@ -1,8 +1,7 @@
-package io.enigma.downloadily
-package io.enigma.downloadily
+package io.enigma.downloadily.standalone
 
+import io.enigma.downloadily.HttpUtils
 import org.scalatest.flatspec.AnyFlatSpec
-
 import java.net.http.HttpResponse
 
 class HttpUtilsSpec extends AnyFlatSpec {

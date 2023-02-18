@@ -1,7 +1,7 @@
-package io.enigma.downloadily
+package io.enigma.downloadily.standalone
 
+import io.enigma.downloadily.{Downloadable, Downloader}
 import org.scalatest.flatspec.AnyFlatSpec
-
 import java.io.File
 
 class DownloaderSpec extends AnyFlatSpec {
