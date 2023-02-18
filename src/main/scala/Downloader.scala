@@ -227,7 +227,6 @@ case class Downloader() {
     this.s3Client = Option(c).orElse(None)
   }
 
-  // Is this function thread safe?
   def download(obj : Downloadable): Unit = {
     logger.info(s"Attempting to download a file from [${obj.source}]")
     try {

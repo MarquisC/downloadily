@@ -57,11 +57,11 @@ case class DownloadController(override val handlerPath : String, override val ha
 
           } catch {
             case _: ThreadPoolIsFullException => {
-              ctx.status(404)
+              ctx.status(429)
               ctx.result(gson.toJson(s"Error, ThreadPoolIsFullException."))
             }
             case _: IllegalThreadStateException => {
-              ctx.status(404)
+              ctx.status(503)
               ctx.result(gson.toJson(s"Error, IllegalThreadStateException."))
             }
             case _: JsonSyntaxException => {
