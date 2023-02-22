@@ -8,7 +8,8 @@ object Config {
   val DEFAULT_JAVALIN_DOWNLOADER_THREAD_POOL_MAX = 3
   val DEFAULT_THREAD_POOL_ENV_VAR = "MAIN_POOL_MAX_THREADS"
   val DOWNLOAD_THREAD_POOL_ENV_VAR = "DL_POOL_MAX_THREADS"
-
+  val DEFAULT_HTTP_CALLBACK_TIMEOUT_SECONDS = 360
+  val DEFAULT_HTTP_HEAD_REQUEST_TIMEOUT_SECONDS = 15
 
   val JAVALIN_THREAD_POOL: ExecutorService = Executors.newFixedThreadPool(sys.env.getOrElse(DEFAULT_THREAD_POOL_ENV_VAR, DEFAULT_JAVALIN_THREAD_POOL_THREAD_MAX).asInstanceOf[Int])
   val JAVALIN_DOWNLOADER_THREAD_POOL: ExecutorService = Executors.newFixedThreadPool(sys.env.getOrElse(DOWNLOAD_THREAD_POOL_ENV_VAR, DEFAULT_JAVALIN_DOWNLOADER_THREAD_POOL_MAX).asInstanceOf[Int])
@@ -18,4 +19,5 @@ object Config {
   def isThreadPoolFull(pool : ThreadPoolExecutor) : Boolean = {
    pool.getActiveCount >= pool.getMaximumPoolSize
   }
+
 }

@@ -21,6 +21,11 @@ post:
 	   -H 'Content-Type: application/json' \
 	   -d "{\"url\":\"https://raw.githubusercontent.com/zio/zio-http/main/zio-http-example/src/main/scala/example/FileStreaming.scala\"}"
 
+post_s3:
+	curl -X POST localhost:7070/download \
+	   -H 'Content-Type: application/json' \
+	   -d "{\"des\": \"s3://test-bucket1\" , \"url\":\"https://raw.githubusercontent.com/zio/zio-http/main/zio-http-example/src/main/scala/example/FileStreaming.scala\"}"
+
 install_localstack_mac:
 	# Reference: https://docs.localstack.cloud/getting-started/installation/#installation
 	pip install localstack
@@ -32,3 +37,6 @@ start_localstack:
 
 stop_localstack:
 	localstack stop
+
+stub_integration: start_localstack
+	(cd ./infra && ./create_s3.sh)
