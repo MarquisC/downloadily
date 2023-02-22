@@ -1,6 +1,6 @@
 package io.enigma.downloadily.controllers
 
-import com.google.gson.{GsonBuilder, JsonSyntaxException}
+import com.google.gson.{Gson, GsonBuilder, JsonSyntaxException}
 import io.enigma.downloadily.Config.ThreadPoolIsFullException
 import io.enigma.downloadily.models.{DownloadRouteModels, ResponseModels}
 import io.enigma.downloadily.{Config, Downloader, HttpUtils}
@@ -17,9 +17,9 @@ case class DownloadController(override val handlerPath : String, override val ha
 
   override def handle(ctx: Context): Unit = {
     ctx.async(
-      Config.JAVALIN_THREAD_POOL, 120, new Runnable {
+      Config.JAVALIN_THREAD_POOL, Config.DEFAULT_HTTP_CALLBACK_TIMEOUT_SECONDS, new Runnable {
 
-        val gson = new GsonBuilder()
+        val gson: Gson = new GsonBuilder()
           .excludeFieldsWithoutExposeAnnotation()
           .create()
 
@@ -30,7 +30,7 @@ case class DownloadController(override val handlerPath : String, override val ha
         }
       },
       new ThrowingRunnable[Exception] {
-        val gson = new GsonBuilder().create()
+        val gson: Gson = new GsonBuilder().create()
 
         override def run(): Unit = {
           try {
@@ -44,7 +44,7 @@ case class DownloadController(override val handlerPath : String, override val ha
               override def run(): Unit = {
                 val http = new HttpUtils()
                 // Check if there's data to process
-                val response = http.httpGetRequest(downloadPostModel.url, 10).asInstanceOf[HttpResponse[_]]
+                val response = http.httpGetRequest(downloadPostModel.url, Config.DEFAULT_HTTP_HEAD_REQUEST_TIMEOUT_SECONDS).asInstanceOf[HttpResponse[_]]
                 if(http.getContentLength(response) != "-1") {
                   logger.debug(s"The download's content length is [${http.getContentLength(response)}]")
                   Downloader.download(downloadPostModel.createDownloadable)

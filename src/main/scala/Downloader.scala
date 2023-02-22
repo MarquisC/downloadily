@@ -94,7 +94,6 @@ case class S3Downloader(obj : Downloadable,
   val logger: Logger = LoggerFactory.getLogger(classOf[S3Downloader])
 
 
-  // ToDo, verified multi-part works, pull down content-length and judge if we can just do S3 put normally
   // For multi-part uploads each chunk, (except the last) must be >= 5 MB
   this.BUFFER_SIZE = 1048576 * 5
 
@@ -172,7 +171,6 @@ case class S3Downloader(obj : Downloadable,
   }
 
   /*
-    ToDo, add if < configurable buffer size, directly upload full byte array
     ToDo, add exception handling for aborting upload
    */
   def download() : Unit = {
@@ -231,7 +229,7 @@ case class Downloader() {
     logger.info(s"Attempting to download a file from [${obj.source}]")
     try {
       var downloader: ChunkyDownloader = LocalDiskDownloader(obj)
-      // do something better than this
+      // Do something better than this
       if(obj.destination.contains("s3")) {
         // Do something better than this
         val destinationKey = downloader.generateOutputFileName(obj)

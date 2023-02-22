@@ -11,7 +11,7 @@ abstract class Controller(val handlerPath : String, val handlerType: HandlerType
 case class HealthzController(override val handlerPath : String, override val handlerType: HandlerType) extends Controller(handlerPath, handlerType) {
   override def handle(ctx: Context): Unit = {
     ctx.async(
-      Config.JAVALIN_THREAD_POOL, 5, new Runnable {
+      Config.JAVALIN_THREAD_POOL, Config.DEFAULT_HTTP_CALLBACK_TIMEOUT_SECONDS, new Runnable {
         val gson = new GsonBuilder()
           .excludeFieldsWithoutExposeAnnotation()
           .create()
